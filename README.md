@@ -1,10 +1,10 @@
-# DETONATE
+# DETONATE for Android
  
 **A focus timer that doesn't stop when the time runs out.**
  
 Most timers go off and forget about it. This one keeps counting — upward, in red — until you actually stop. Then it hands you a break sized to the block you just finished, and takes back some of it if you ran late.
  
-It's a single HTML file. No account, no server, no analytics, no dependencies. Install it on your iPhone home screen and it runs offline.
+It installs as a real Android app: its own launcher icon, its own entry in the app drawer, no browser UI, works offline. No account, no server, no analytics, no dependencies, no Play Store.
  
 <img src="shots/01-timer.png" width="250"> <img src="shots/02-overdue.png" width="250"> <img src="shots/03-rest.png" width="250">
  
@@ -14,9 +14,9 @@ It's a single HTML file. No account, no server, no analytics, no dependencies. I
  
 **Set a block, name it, arm it.** Anything from 1 to 60 minutes. Type `Draft the intro 15` and it parses the 15 for you.
  
-**Then it counts down like a bomb.** Seven-segment digits, a blinking colon, a click every second that doubles in rate and jumps in pitch for the final ten. Four detonator wires across the top — one severs per completed block.
+**Then it counts down like a bomb.** Seven-segment digits, a blinking colon, a click every second that doubles in rate and jumps in pitch for the final ten — and the phone ticks in your hand along with it.
  
-**When it hits zero, it doesn't stop.** A klaxon sounds, the screen flashes, the minus sign lights, and the clock counts *up*. `-02:47` means you're nearly three minutes into work you said would already be done. There's no auto-stop, because the whole point is to see the overrun.
+**When it hits zero, it doesn't stop.** A klaxon sounds, the screen flashes, the phone hammers a five-pulse pattern, the minus sign lights, and the clock counts *up*. `-02:47` means you're nearly three minutes into work you said would already be done. A heartbeat buzzes every two seconds until you stop it. There's no auto-stop, because the whole point is to see the overrun.
  
 **Your break is earned, not fixed.** Finish a block and you get a rest worth 20% of it — a 10-minute block earns 2 minutes, a 50-minute block earns 10. Every fourth block earns 30. The display turns amber. Run over into your break and it goes red again.
  
@@ -24,9 +24,13 @@ It's a single HTML file. No account, no server, no analytics, no dependencies. I
  
 **Queue up a session.** Add tasks with durations and they run in order, each one auto-arming when the previous rest ends. Unfinished blocks stay in the queue.
  
-**Turn the phone sideways** and the timer takes over the whole screen — digits only, black everywhere else. If you keep rotation lock on, tap the display instead: it rotates in software so you can stand the phone on its side against a monitor. Controls fade out after four seconds. The digits drift a few pixels every minute to spare the OLED.
+**Turn the phone sideways** and the timer takes over the whole screen — digits only, black everywhere else. If you keep rotation lock on, tap the display instead: it rotates in software so you can stand the phone on its side against a monitor. Controls fade out after four seconds; the back gesture returns to the app instead of quitting it. The digits drift a few pixels every minute to spare the OLED.
  
 <img src="shots/04-clock.png" width="620">
+**It keeps running with the screen off.** The countdown survives backgrounding, the alarm still fires, and while a block runs the remaining time and task name appear on your lock screen and in the notification shade with a progress bar. The moment a block ends you get a notification.
+ 
+**Long-press the launcher icon** for shortcuts: start a 25-minute block, start a 50-minute block, or jump straight to the sideways clock.
+ 
 **It logs what actually happened.** Every block records what you predicted against what you spent, and the Log tab turns that into a calibration figure. If it reads 140%, your instinct is packing two hours of work into ninety minutes.
  
 <img src="shots/05-queue.png" width="250"> <img src="shots/06-log.png" width="250">
@@ -54,17 +58,25 @@ The full version of this lives in the app's **Brief** tab, so it's there when yo
  
 ---
  
-## Install on iPhone
+## Install
  
-`index.html` runs on its own. The other four files turn it into a home-screen app with an icon that works offline.
- 
-1. Create a public GitHub repo and upload all the files.
+1. Create a public GitHub repo and upload everything in this folder, **keeping the structure** — including the hidden `.nojekyll` file and the `.well-known` folder. Drag the whole folder into **Add file → Upload files**.
 2. **Settings → Pages** → Source: *Deploy from a branch* → Branch `main`, folder `/ (root)` → Save.
-3. Wait a minute, then open `https://YOURNAME.github.io/REPO/` **in Safari on your iPhone**. Only Safari can install to the home screen.
-4. **Share → Add to Home Screen → Add.**
-It now launches fullscreen with no browser chrome, keeps its data between launches, and works with no signal.
+3. Open `https://YOURNAME.github.io/REPO/` in **Chrome on Android**.
+4. Tap **Install** in the app's Configuration list, or Chrome's ⋮ menu → **Add to Home screen → Install**.
+Chrome builds a **WebAPK** from this — a genuine installed app with a splash screen, an adaptive icon, and an entry in Settings → Apps. Not a bookmark.
  
-*Just testing?* Email yourself `index.html` and open it in Safari. Everything works except home-screen install and offline caching.
+### Optional: a real APK
+ 
+The WebAPK is already a real app for everyday use. If you specifically want an `.apk` to sideload or publish:
+ 
+```bash
+npm install -g @bubblewrap/cli
+bubblewrap init --manifest https://YOURNAME.github.io/REPO/manifest.json
+bubblewrap build
+```
+ 
+Bubblewrap installs the JDK and Android SDK on first run and outputs `app-release-signed.apk`. To make it open without a URL bar, paste the SHA-256 fingerprint Bubblewrap prints into `.well-known/assetlinks.json`, set `package_name` to match, and push. The `.nojekyll` file is what makes GitHub Pages serve that dot-folder at all.
  
 ---
  
@@ -77,16 +89,21 @@ It now launches fullscreen with no browser chrome, keeps its data between launch
 | **Overtime debt** | Late minutes come out of your rest. Floored at a quarter of the earned break. |
 | **Auto-advance** | Arm the next queued block automatically when a rest ends. |
 | **Ticking** | Per-second clicks, accelerating in the last ten. |
+| **Haptics** | Vibration through the countdown, at zero, and while overdue. |
+| **Run in background** | Keeps the clock alive with the screen off; lock-screen display; end-of-block notifications. |
 | **Sideways clock** | Landscape takes over the screen; tap the display to rotate in software. |
 | **Keep screen awake** | Holds the display on while a block runs, via the Wake Lock API. |
  
 ---
  
-## Known iOS limitations
+## How "Run in background" works, and when it doesn't
  
-- **Backgrounding.** iOS suspends the app when you leave it. The clock is timestamp-based, so it shows the correct time the instant you return — but ticking and the alarm stop while it's suspended. Keep it on screen if you need to hear the alarm; *Keep screen awake* is on by default for exactly this reason.
-- **No haptics.** Safari doesn't implement the Vibration API. The Android build of this app buzzes with the countdown; the iPhone can't.
-- **Audio needs a tap.** iOS requires one user gesture before any sound plays. The first Arm press does it. Check the physical silent switch too.
+Android freezes background pages, which would stall the timer. The app works around this by playing a silent looping track, which marks it as playing media — that's also what puts the countdown on your lock screen. Some phones will show a small media notification while a block runs. That's the mechanism, not a bug.
+ 
+Manufacturer battery optimisation can still kill it, Samsung, Xiaomi and OnePlus especially. If the alarm becomes unreliable, set **Settings → Apps → DETONATE → Battery → Unrestricted**.
+ 
+The clock itself never drifts either way: it's derived from a stored timestamp, not from counting ticks, so it shows the correct time the instant you return regardless of what the OS did while you were away.
+ 
 ---
  
 ## Under the hood
@@ -94,15 +111,17 @@ It now launches fullscreen with no browser chrome, keeps its data between launch
 | File | |
 |---|---|
 | `index.html` | The entire app — markup, styles, logic. No build step, no dependencies, no framework. |
-| `manifest.json` | Home-screen name, icon, colours, standalone display. |
-| `sw.js` | Service worker; caches everything for offline use. |
-| `icon-192.png`, `icon-512.png` | App icons. |
+| `manifest.json` | App identity, adaptive icons, launcher shortcuts, unlocked orientation. |
+| `sw.js` | Service worker; offline cache and notification handling. |
+| `icon-*.png` | Standard, maskable (adaptive) and monochrome (themed / badge) icons. |
+| `.well-known/assetlinks.json` | Digital Asset Links template, only needed for the APK route. |
+| `.nojekyll` | Makes GitHub Pages serve the `.well-known` folder. |
  
-The seven-segment digits are drawn in CSS — each digit is seven clipped `<span>`s with unlit ghost segments sitting behind at 5% opacity, which is what gives it the LED-panel look without shipping a font. Sound is synthesised with the Web Audio API, so there are no audio assets either.
+The seven-segment digits are drawn in CSS — each digit is seven clipped `<span>`s with unlit ghost segments sitting behind at 5% opacity, which is what gives it the LED-panel look without shipping a font. Sound is synthesised with the Web Audio API and the keep-alive track is generated as a WAV in JavaScript, so there are no audio assets either.
  
-Timing never counts ticks. Everything derives from `Date.now()` against a stored start timestamp, so backgrounding, throttling and dropped frames can't make the clock drift.
+Every Android-specific capability is feature-detected, so this build also runs correctly on iPhone — the haptics row simply hides itself. You can use one repo for both platforms if maintaining two gets annoying.
  
-**Editing it:** open `index.html` in any editor. Colours are CSS custom properties at the top (`--red`, `--amber`, `--void`). Rest logic is the `restFor()` function. If you change anything, bump `CACHE = "detonate-v1"` in `sw.js` or installed copies will keep serving the cached old version.
+**Editing it:** open `index.html` in any editor. Colours are CSS custom properties at the top (`--red`, `--amber`, `--void`). Rest logic is the `restFor()` function. If you change anything, bump `CACHE = "detonate-a1"` in `sw.js` or installed copies will keep serving the cached old version.
  
 ---
  
