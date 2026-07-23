@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DETONATE">
+<meta name="theme-color" content="#08090a">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-title" content="DETONATE">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>DETONATE</title>
+<style>
+:root{
+  --void:#08090a;
+  --panel:#101216;
+  --panel-2:#15181d;
+  --hair:#22262d;
+  --hair-2:#2e333c;
+  --stencil:#7e8489;
+  --stencil-dim:#4b5057;
+  --bone:#d8d5cd;
+  --red:#ff2f14;
+  --red-deep:#8c1204;
+  --amber:#ffab1f;
+  --amber-deep:#7a4a00;
+  --led:var(--red);
+  --led-deep:var(--red-deep);
+  --t-fast:120ms;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--void);
+  color:var(--bone);
+  font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;
+  touch-action:manipulation;
+}
+/* ambient casing texture */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.05), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.014) 0 1px, transparent 1px 3px);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
+  background:radial-gradient(130% 100% at 50% 50%, transparent 45%, rgba(0,0,0,.75));
+}
+#glare{
+  position:fixed;inset:0;pointer-events:none;z-index:55;opacity:0;
+  background:radial-gradient(80% 60% at 50% 38%, rgba(255,47,20,.5), transparent 70%);
+  transition:opacity 90ms linear;
+}
+
+.device{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;
+  height:100dvh;max-width:520px;margin:0 auto;
+  padding-top:env(safe-area-inset-top);
+}
+
+/* ── stencil type ─────────────────────────────── */
+.stencil{
+  font-size:9.5px;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--stencil);font-weight:600;
+}
+.stencil.dim{color:var(--stencil-dim);}
+
+/* ── fuse rail ────────────────────────────────── */
+.rail{
+  flex:0 0 auto;padding:12px 18px 10px;
+  border-bottom:1px solid var(--hair);
+  background:linear-gradient(180deg,var(--panel),transparent);
+}
+.rail-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.wires{display:flex;gap:7px;}
+.wire{
+  position:relative;flex:1;height:14px;display:flex;align-items:center;
+}
+.wire i{
+  display:block;height:2px;width:100%;border-radius:2px;
+  background:var(--wc,#3a3f47);opacity:.32;
+  transition:opacity 200ms, background 200ms;
+}
+.wire.live i{opacity:1;box-shadow:0 0 8px var(--wc);}
+.wire.cut i{
+  opacity:.9;
+  background:linear-gradient(90deg,var(--wc) 0 38%,transparent 38% 62%,var(--wc) 62% 100%);
+  box-shadow:none;filter:saturate(.25) brightness(.55);
+}
+.wire.cut::after{
+  content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:5px;height:5px;border-radius:50%;background:var(--wc);opacity:.35;
+}
+.wire:nth-child(1){--wc:#ff2f14}
+.wire:nth-child(2){--wc:#ffab1f}
+.wire:nth-child(3){--wc:#49d1c6}
+.wire:nth-child(4){--wc:#c9c6bd}
+
+/* ── scroll body ──────────────────────────────── */
+main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.pane{display:none;padding:16px 18px 28px;}
+.pane.on{display:block;}
+
+/* ── the window (LED display) ─────────────────── */
+.window{
+  position:relative;margin-top:6px;
+  border:1px solid var(--hair);border-radius:4px;
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.035),transparent 30%),
+    #050607;
+  box-shadow:inset 0 0 0 4px rgba(0,0,0,.6), inset 0 8px 26px rgba(0,0,0,.9);
+  padding:22px 14px 16px;overflow:hidden;
+}
+.window::after{ /* glass scanlines */
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 1px,transparent 1px 3px);
+  opacity:.5;
+}
+.readout{position:relative;display:flex;justify-content:center;align-items:center;gap:4px;}
+
+/* seven-segment */
+.seg-digit{
+  position:relative;width:var(--dw);height:calc(var(--dw)*1.86);
+  --t:calc(var(--dw)*.155);
+}
+.seg-digit span{position:absolute;background:var(--led);opacity:.055;transition:opacity 70ms linear;}
+.seg-digit span.on{opacity:1;box-shadow:0 0 calc(var(--dw)*.28) var(--led-deep);}
+.seg-digit .h{
+  left:calc(var(--t)*.6);width:calc(100% - var(--t)*1.2);height:var(--t);
+  clip-path:polygon(0 50%,14% 0,86% 0,100% 50%,86% 100%,14% 100%);
+}
+.seg-digit .v{
+  width:var(--t);height:calc(50% - var(--t)*1.2);
+  clip-path:polygon(50% 0,100% 7%,100% 93%,50% 100%,0 93%,0 7%);
+}
+.seg-digit .a{top:0}
+.seg-digit .g{top:calc(50% - var(--t)/2)}
+.seg-digit .d{bottom:0}
+.seg-digit .f{left:0;top:calc(var(--t)*.6)}
+.seg-digit .b{right:0;top:calc(var(--t)*.6)}
+.seg-digit .e{left:0;top:calc(50% + var(--t)*.6)}
+.seg-digit .c{right:0;top:calc(50% + var(--t)*.6)}
+
+.colon{width:calc(var(--dw)*.34);height:calc(var(--dw)*1.86);position:relative;}
+.colon i{
+  position:absolute;left:50%;transform:translateX(-50%);
+  width:calc(var(--dw)*.15);height:calc(var(--dw)*.15);border-radius:50%;
+  background:var(--led);opacity:1;box-shadow:0 0 10px var(--led-deep);
+}
+.colon i:first-child{top:30%}
+.colon i:last-child{bottom:30%}
+.colon.blink i{animation:cb 1s steps(1,end) infinite;}
+@keyframes cb{0%,49%{opacity:1}50%,100%{opacity:.06}}
+
+.sign{width:calc(var(--dw)*.5);height:calc(var(--dw)*1.86);position:relative;}
+.sign i{
+  position:absolute;top:calc(50% - var(--dw)*.077);left:0;
+  width:100%;height:calc(var(--dw)*.155);background:var(--led);
+  clip-path:polygon(0 50%,20% 0,80% 0,100% 50%,80% 100%,20% 100%);
+  opacity:0;transition:opacity 80ms;
+}
+.sign.on i{opacity:1;box-shadow:0 0 12px var(--led-deep);}
+
+.readout{--dw:min(15.5vw,74px);}
+
+/* ── sideways clock (stage) ───────────────────── */
+#stage{
+  position:fixed;inset:0;z-index:80;display:none;
+  background:radial-gradient(120% 100% at 50% 50%,#060708 30%,#000 100%);
+}
+body.stage-on #stage{display:block;}
+body.stage-on{overflow:hidden;}
+.stage-inner{
+  position:absolute;top:50%;left:50%;
+  width:100vw;height:100dvh;transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+#stage.rot .stage-inner{width:100dvh;height:100vw;transform:translate(-50%,-50%) rotate(90deg);}
+.drift{
+  display:flex;flex-direction:column;align-items:center;
+  transition:transform 4s ease-in-out;
+}
+.readout.big{--dw:var(--bigdw,60px);}
+.readout.big .seg-digit span{opacity:.04;}
+.readout.big .seg-digit span.on{opacity:1;}
+.stage-task{
+  font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--stencil-dim);
+  margin-bottom:min(3.4vh,26px);max-width:74vw;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;text-align:center;
+}
+.stage-bar{width:52%;height:2px;margin-top:min(3.6vh,28px);background:rgba(255,255,255,.06);overflow:hidden;}
+.stage-bar i{display:block;height:100%;width:0%;background:var(--led);box-shadow:0 0 10px var(--led-deep);transition:width 200ms linear;}
+.stage-ctl{
+  position:absolute;bottom:3%;left:0;right:0;
+  display:flex;gap:10px;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity 350ms;
+}
+.stage-ctl.show{opacity:1;pointer-events:auto;}
+.stage-ctl button{
+  padding:11px 22px;border-radius:3px;background:rgba(255,255,255,.04);
+  border:1px solid var(--hair-2);color:var(--stencil);font-size:10px;letter-spacing:.26em;
+}
+.stage-ctl button.go{color:var(--led);border-color:var(--led-deep);}
+.window{cursor:pointer;}
+.hint{
+  display:block;text-align:center;margin-top:9px;
+  font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:#3d4249;
+}
+
+/* status line */
+.status{
+  position:relative;display:flex;justify-content:space-between;align-items:baseline;
+  margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.05);
+}
+#statusText{color:var(--led);letter-spacing:.3em;font-size:10px;font-weight:700;text-transform:uppercase;}
+#statusMeta{font-size:10px;letter-spacing:.18em;color:var(--stencil-dim);text-transform:uppercase;}
+body.pulse #statusText{animation:blip .9s steps(1,end) infinite;}
+@keyframes blip{0%,55%{opacity:1}56%,100%{opacity:.25}}
+
+/* depletion bar */
+.bar{position:relative;height:3px;margin-top:12px;background:rgba(255,255,255,.05);overflow:hidden;}
+.bar i{display:block;height:100%;width:0%;background:var(--led);box-shadow:0 0 10px var(--led-deep);transition:width 180ms linear;}
+
+/* ── label tape (task) ────────────────────────── */
+.tape{
+  margin-top:12px;display:flex;align-items:center;gap:10px;
+  background:var(--panel-2);border:1px solid var(--hair);border-left:3px solid var(--led);
+  padding:11px 12px;border-radius:2px;min-height:44px;
+}
+.tape .k{font-size:9px;letter-spacing:.26em;color:var(--stencil-dim);flex:0 0 auto;text-transform:uppercase;}
+.tape .val{font-size:14px;letter-spacing:.06em;color:var(--bone);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tape .val.empty{color:var(--stencil-dim);}
+
+/* ── controls ─────────────────────────────────── */
+.controls{margin-top:16px;display:flex;gap:10px;}
+button{
+  font-family:inherit;border:none;cursor:pointer;color:inherit;
+  font-size:11px;letter-spacing:.26em;font-weight:700;text-transform:uppercase;
+}
+.btn{
+  flex:1;padding:17px 10px;border-radius:3px;
+  background:linear-gradient(180deg,var(--panel-2),#0c0e11);
+  border:1px solid var(--hair-2);
+  box-shadow:0 1px 0 rgba(255,255,255,.05) inset,0 3px 0 #05060700;
+  transition:transform var(--t-fast),background var(--t-fast),border-color var(--t-fast);
+}
+.btn:active{transform:translateY(1px);background:#0a0c0e;}
+.btn.primary{
+  background:linear-gradient(180deg,#2a0a04,#160502);
+  border-color:var(--red-deep);color:#ff7a63;
+  box-shadow:0 0 24px rgba(255,47,20,.14) inset;
+}
+.btn.primary.hot{color:#fff;border-color:var(--red);box-shadow:0 0 30px rgba(255,47,20,.3) inset,0 0 18px rgba(255,47,20,.2);}
+.btn.ghost{flex:0 0 34%;color:var(--stencil);}
+.btn[disabled]{opacity:.3;pointer-events:none;}
+
+/* ── dial ─────────────────────────────────────── */
+.block{margin-top:22px;}
+.block > .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+.chip{
+  padding:9px 0;flex:1 1 calc(25% - 6px);min-width:56px;text-align:center;
+  background:var(--panel);border:1px solid var(--hair);border-radius:2px;
+  font-size:11px;letter-spacing:.1em;color:var(--stencil);
+}
+.chip.sel{border-color:var(--led);color:var(--led);background:rgba(255,47,20,.07);}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:26px;background:transparent;margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:2px;background:linear-gradient(90deg,var(--led) var(--pct,0%),var(--hair-2) var(--pct,0%));
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:26px;margin-top:-12px;border-radius:2px;
+  background:linear-gradient(180deg,#e8e4dc,#8b8880);border:1px solid #000;
+}
+input[type=text],input[type=number]{
+  width:100%;background:#0a0c0e;border:1px solid var(--hair);color:var(--bone);
+  padding:13px 12px;border-radius:2px;font-family:inherit;font-size:15px;letter-spacing:.04em;
+  -webkit-appearance:none;
+}
+input::placeholder{color:#3d4249;}
+input:focus{outline:none;border-color:var(--led);}
+
+/* ── settings rows ────────────────────────────── */
+.row{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:13px 0;border-bottom:1px solid var(--hair);
+}
+.row:last-child{border-bottom:none;}
+.row .lbl{font-size:12px;letter-spacing:.04em;color:var(--bone);}
+.row .sub{font-size:10px;letter-spacing:.08em;color:var(--stencil-dim);margin-top:3px;line-height:1.4;}
+.sw{
+  flex:0 0 auto;width:44px;height:24px;border-radius:2px;background:#0a0c0e;
+  border:1px solid var(--hair-2);position:relative;
+}
+.sw i{
+  position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:1px;
+  background:#3d4249;transition:all 140ms;
+}
+.sw.on{border-color:var(--led-deep);background:rgba(255,47,20,.1);}
+.sw.on i{left:22px;background:var(--led);box-shadow:0 0 10px var(--led-deep);}
+.stepper{display:flex;align-items:center;gap:2px;flex:0 0 auto;}
+.stepper button{
+  width:34px;height:32px;background:var(--panel);border:1px solid var(--hair-2);
+  color:var(--stencil);font-size:15px;letter-spacing:0;
+}
+.stepper .num{
+  min-width:52px;text-align:center;font-size:13px;letter-spacing:.08em;color:var(--led);
+}
+
+/* ── queue ────────────────────────────────────── */
+.qitem{
+  display:flex;align-items:center;gap:12px;padding:14px 12px;
+  background:var(--panel);border:1px solid var(--hair);border-left:2px solid var(--hair-2);
+  border-radius:2px;margin-bottom:7px;
+}
+.qitem.next{border-left-color:var(--led);}
+.qitem .idx{font-size:9px;letter-spacing:.2em;color:var(--stencil-dim);flex:0 0 auto;width:20px;}
+.qitem .nm{flex:1 1 auto;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.qitem .mn{font-size:11px;letter-spacing:.14em;color:var(--led);flex:0 0 auto;}
+.qitem .x{flex:0 0 auto;width:30px;height:30px;background:none;border:none;color:var(--stencil-dim);font-size:16px;letter-spacing:0;}
+.empty-state{
+  border:1px dashed var(--hair-2);border-radius:2px;padding:26px 18px;text-align:center;
+  font-size:12px;color:var(--stencil-dim);line-height:1.6;letter-spacing:.04em;
+}
+.addrow{display:flex;gap:7px;margin-bottom:12px;}
+.addrow input[type=text]{flex:1 1 auto;}
+.addrow input[type=number]{flex:0 0 74px;text-align:center;}
+.addrow button{flex:0 0 52px;background:var(--panel-2);border:1px solid var(--hair-2);border-radius:2px;color:var(--led);font-size:18px;letter-spacing:0;}
+
+/* ── log ──────────────────────────────────────── */
+.stats{display:flex;gap:7px;margin-bottom:18px;}
+.stat{flex:1;background:var(--panel);border:1px solid var(--hair);border-radius:2px;padding:14px 10px;text-align:center;}
+.stat .v{font-size:20px;color:var(--led);letter-spacing:.02em;font-weight:300;}
+.stat .v.warn{color:var(--amber);}
+.stat .k{font-size:8.5px;letter-spacing:.2em;color:var(--stencil-dim);margin-top:6px;text-transform:uppercase;}
+.lgrow{display:flex;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid var(--hair);font-size:12px;}
+.lgrow .nm{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lgrow .pl{color:var(--stencil-dim);font-size:11px;letter-spacing:.08em;flex:0 0 auto;}
+.lgrow .ov{flex:0 0 auto;font-size:11px;letter-spacing:.08em;color:var(--amber);}
+.lgrow .ov.clean{color:#49d1c6;}
+
+/* ── brief ────────────────────────────────────── */
+.brief h2{
+  font-size:10px;letter-spacing:.3em;color:var(--led);font-weight:700;
+  text-transform:uppercase;margin:26px 0 10px;
+}
+.brief h2:first-child{margin-top:4px;}
+.brief p{font-size:13.5px;line-height:1.65;color:#a8a49c;margin:0 0 12px;letter-spacing:.01em;}
+.brief p b{color:var(--bone);font-weight:600;}
+.brief .cite{font-size:10px;letter-spacing:.06em;color:var(--stencil-dim);display:block;margin-top:-6px;margin-bottom:14px;}
+.rule{height:1px;background:var(--hair);margin:24px 0;}
+
+/* ── tab bar ──────────────────────────────────── */
+nav{
+  flex:0 0 auto;display:flex;border-top:1px solid var(--hair);
+  background:var(--panel);padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;padding:15px 4px 14px;background:none;color:var(--stencil-dim);
+  font-size:9px;letter-spacing:.24em;border-top:2px solid transparent;margin-top:-1px;
+}
+nav button.on{color:var(--led);border-top-color:var(--led);}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none !important;transition:none !important;}
+}
+</style>
+</head>
+<body>
+<div id="glare"></div>
+
+<div id="stage">
+  <div class="stage-inner">
+    <div class="drift" id="drift">
+      <div class="stage-task" id="stageTask"></div>
+      <div class="readout big" id="bigReadout"></div>
+      <div class="stage-bar"><i id="stageBar"></i></div>
+    </div>
+    <div class="stage-ctl" id="stageCtl">
+      <button id="stageMain" class="go">Arm</button>
+      <button id="stageExit">Exit</button>
+    </div>
+  </div>
+</div>
+
+<div class="device">
+
+  <header class="rail">
+    <div class="rail-top">
+      <span class="stencil">Set <b id="setNum">1</b> · Block <b id="blkNum">1</b>/4</span>
+      <span class="stencil dim" id="clock">--:--</span>
+    </div>
+    <div class="wires">
+      <div class="wire" data-w="0"><i></i></div>
+      <div class="wire" data-w="1"><i></i></div>
+      <div class="wire" data-w="2"><i></i></div>
+      <div class="wire" data-w="3"><i></i></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ══ TIMER ══ -->
+    <section class="pane on" id="pane-timer">
+      <div class="window">
+        <div class="readout" id="readout"></div>
+        <div class="status">
+          <span id="statusText">Standby</span>
+          <span id="statusMeta">Set a block</span>
+        </div>
+        <div class="bar"><i id="barFill"></i></div>
+      </div>
+
+      <span class="hint" id="stageHint">Tap the display for the sideways clock</span>
+
+      <div class="tape">
+        <span class="k">Task</span>
+        <span class="val empty" id="taskVal">Unnamed block</span>
+      </div>
+
+      <div class="controls">
+        <button class="btn primary" id="mainBtn">Arm</button>
+        <button class="btn ghost" id="altBtn" disabled>Abort</button>
+      </div>
+
+      <div class="block" id="setupBlock">
+        <div class="hd"><span class="stencil">Charge duration</span><span class="stencil dim" id="durLbl">25 min</span></div>
+        <div class="chips" id="chips"></div>
+        <input type="range" id="durRange" min="1" max="60" value="25">
+        <input type="text" id="taskInput" placeholder="Name this block — e.g. Draft intro 15" style="margin-top:14px">
+        <div class="sub" style="font-size:10px;letter-spacing:.08em;color:var(--stencil-dim);margin-top:8px;line-height:1.5">
+          Type a number at the end to set the duration.
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="hd"><span class="stencil">Configuration</span></div>
+        <div class="row" id="installRow" style="display:none">
+          <div><div class="lbl">Install app</div><div class="sub">Adds DETONATE to your home screen and app drawer. Runs offline afterwards.</div></div>
+          <button class="btn" id="installBtn" style="flex:0 0 auto;padding:12px 20px">Install</button>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Rest ratio</div><div class="sub">Short rest = this share of the block you just finished.</div></div>
+          <div class="stepper"><button data-step="ratio,-5">–</button><span class="num" id="ratioNum">20%</span><button data-step="ratio,5">+</button></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Long rest</div><div class="sub">After every fourth block.</div></div>
+          <div class="stepper"><button data-step="long,-5">–</button><span class="num" id="longNum">30 min</span><button data-step="long,5">+</button></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Overtime debt</div><div class="sub">Minutes you run late come out of your rest. Never cuts below a quarter of it.</div></div>
+          <div class="sw" id="swDebt"><i></i></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Auto-advance</div><div class="sub">Arm the next queued block when rest ends.</div></div>
+          <div class="sw" id="swAuto"><i></i></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Sideways clock</div><div class="sub">Turn the phone to landscape and the timer takes over the screen. Tap the display to do it without rotating.</div></div>
+          <div class="sw" id="swStage"><i></i></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Ticking</div><div class="sub">Clicks each second, faster in the last ten.</div></div>
+          <div class="sw" id="swSound"><i></i></div>
+        </div>
+        <div class="row" id="hapticRow">
+          <div><div class="lbl">Haptics</div><div class="sub">The phone ticks with the clock and hammers when you go overdue.</div></div>
+          <div class="sw" id="swHaptic"><i></i></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Run in background</div><div class="sub">Keeps the clock alive with the screen off, shows it on your lock screen, and posts a notification the moment a block ends.</div></div>
+          <div class="sw" id="swBg"><i></i></div>
+        </div>
+        <div class="row">
+          <div><div class="lbl">Keep screen awake</div><div class="sub">Holds the display on while a block runs.</div></div>
+          <div class="sw" id="swWake"><i></i></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ QUEUE ══ -->
+    <section class="pane" id="pane-queue">
+      <div class="hd" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span class="stencil">Payload</span>
+        <span class="stencil dim" id="queueTotal">0 min total</span>
+      </div>
+      <div class="addrow">
+        <input type="text" id="qName" placeholder="Task" enterkeyhint="done">
+        <input type="number" id="qMin" placeholder="25" min="1" max="60" inputmode="numeric">
+        <button id="qAdd">+</button>
+      </div>
+      <div id="queueList"></div>
+      <button class="btn" id="qClear" style="margin-top:14px">Clear queue</button>
+      <p style="font-size:11px;line-height:1.6;color:var(--stencil-dim);letter-spacing:.04em;margin-top:18px">
+        Finish a block and the next one loads automatically. Blocks stay in the queue until they're done, so an abandoned block comes back.
+      </p>
+    </section>
+
+    <!-- ══ LOG ══ -->
+    <section class="pane" id="pane-log">
+      <div class="stats">
+        <div class="stat"><div class="v" id="stBlocks">0</div><div class="k">Blocks</div></div>
+        <div class="stat"><div class="v" id="stFocus">0m</div><div class="k">Focused</div></div>
+        <div class="stat"><div class="v warn" id="stOver">0m</div><div class="k">Overrun</div></div>
+      </div>
+      <div class="row" style="border-bottom:1px solid var(--hair);padding-bottom:14px">
+        <div><div class="lbl">Estimate accuracy</div><div class="sub" id="accSub">Not enough data yet.</div></div>
+        <div class="num" id="accNum" style="font-size:16px;color:var(--led);letter-spacing:.06em">—</div>
+      </div>
+      <div style="margin-top:18px" id="logList"></div>
+      <button class="btn" id="logClear" style="margin-top:16px">Clear log</button>
+    </section>
+
+    <!-- ══ BRIEF ══ -->
+    <section class="pane brief" id="pane-brief">
+      <h2>Why the timer is visible</h2>
+      <p>A countdown converts a vague intention into a deadline you can see. That's <b>timeboxing</b>: instead of working on a task until it's done, you commit a fixed amount of time to it and let the boundary do the deciding. The constraint is the point — it forces a scope decision up front and blocks the drift into "just a bit longer."</p>
+
+      <h2>Why blocks end before you're tired</h2>
+      <p>Sustained attention degrades on its own. Performance on a single continuous task declines measurably over time — the <b>vigilance decrement</b>. Ariga and Lleras argued in 2011 that this isn't a fuel tank running dry but goal habituation: your brain stops registering a goal that never changes, the same way it tunes out a constant sound. Their fix was brief interruptions. Participants given two short diversions during a fifty-minute task held their accuracy flat while the control group's fell away.</p>
+      <span class="cite">Ariga &amp; Lleras, <i>Cognition</i> 118(3), 2011</span>
+      <p>So the break isn't a reward for finishing. It's the mechanism. It deactivates the goal so it can be reactivated fresh.</p>
+
+      <h2>Why rest scales with the block</h2>
+      <p>A fixed five minutes is Pomodoro's convention, not a law. A 2022 meta-analysis of 22 micro-break studies found short breaks reliably reduced fatigue and raised vigor, but performance gains showed up mainly on less demanding tasks — and the longer the break, the bigger the boost. The authors' own conclusion was that recovering from heavy cognitive work likely needs more than ten minutes.</p>
+      <span class="cite">Albulescu et al., <i>PLOS ONE</i> 17(8), 2022</span>
+      <p>Hence proportional rest. A 10-minute block earns a token pause; a 50-minute block earns something that can actually restore you. The long rest after four blocks maps onto the same logic at a larger scale — your body cycles through roughly 90-minute activity troughs, and four short blocks plus their breaks lands near one.</p>
+
+      <h2>Why it counts your overtime</h2>
+      <p>You are systematically bad at estimating how long your own work takes — the <b>planning fallacy</b>, and it doesn't improve just from doing more work. It improves from feedback. Every finished block here records what you predicted against what you actually spent, which is the raw material for recalibration. Watch the accuracy figure in the log; if it sits at 140%, your instinct is to plan two hours of work into ninety minutes.</p>
+      <p>The overrun counter also makes stopping a deliberate act. An interrupted task stays noisier in memory than a finished one — the <b>Zeigarnik effect</b> — which is why leaving a block mid-sentence often makes the next one easier to start.</p>
+
+      <h2>Where urgency stops helping</h2>
+      <p>Arousal improves performance up to a point and then wrecks it. Amabile's diary study of 177 people found that time pressure, contrary to the folklore, generally <i>reduced</i> creative thinking. The exception mattered: high-pressure days still produced creative work when people felt they were on a mission — focused, protected from interruption, clear on why the deadline existed. When they felt like they were on a treadmill, being yanked between tasks, creativity collapsed.</p>
+      <span class="cite">Amabile, Hadley &amp; Kramer, <i>Harvard Business Review</i>, Aug 2002</span>
+      <p>Practical reading: use tight blocks for defined, executional work — the inbox, the edit pass, the thing you've been avoiding. For genuinely open-ended thinking, set a long block and ignore the countdown, or don't arm it at all. The device is a tool, not a supervisor.</p>
+
+      <div class="rule"></div>
+      <h2>Operating notes</h2>
+      <p><b>Name every block.</b> A specific commitment — "outline section 3," not "writing" — is an implementation intention, and those survive contact with distraction far better than vague goals.</p>
+      <p><b>Take the rest away from the screen.</b> Breaks restore attention when they're a real shift; scrolling keeps the same machinery running.</p>
+      <p><b>One minute is a legitimate block.</b> If a task feels immovable, arm the smallest block you can't refuse. Starting is the expensive part.</p>
+      <p style="color:var(--stencil-dim);font-size:12px;margin-top:20px">The bomb is decoration. Nothing here is a real deadline unless you decide it is, and running a punishing schedule for weeks costs more than it earns.</p>
+    </section>
+  </main>
+
+  <nav>
+    <button class="on" data-tab="timer">Timer</button>
+    <button data-tab="queue">Queue</button>
+    <button data-tab="log">Log</button>
+    <button data-tab="brief">Brief</button>
+  </nav>
+</div>
+
+<script>
+"use strict";
+
+/* ═══════════ storage adapter ═══════════ */
+const store = (() => {
+  const mem = {};
+  const ws = (typeof window !== "undefined" && window.storage && typeof window.storage.get === "function") ? window.storage : null;
+  return {
+    async get(k){
+      if(ws){ try{ const r = await ws.get(k); return r && r.value ? JSON.parse(r.value) : null; }catch(e){ return null; } }
+      try{ const v = window.localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return k in mem ? mem[k] : null; }
+    },
+    async set(k,v){
+      const s = JSON.stringify(v);
+      if(ws){ try{ await ws.set(k,s); return; }catch(e){} }
+      try{ window.localStorage.setItem(k,s); }catch(e){ mem[k]=v; }
+    }
+  };
+})();
+const KEY = "detonate.v1";
+
+/* ═══════════ state ═══════════ */
+const S = {
+  phase:"idle",        // idle | work | rest
+  startedAt:0,
+  durationMs:0,
+  taskName:"",
+  restIsLong:false,
+  blockIndex:0,        // completed blocks within the current set (0-3)
+  setNum:1,
+  pendingMin:25,
+  queue:[],
+  log:[],
+  ratio:20,
+  longRest:30,
+  debt:true,
+  auto:true,
+  sound:true,
+  wake:true,
+  stage:true,
+  haptics:true,
+  background:true,
+  askedNotify:false,
+  fired:false          // alarm already played for this phase
+};
+
+let saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{ store.set(KEY, S); }, 250);
+}
+async function load(){
+  const d = await store.get(KEY);
+  if(d && typeof d === "object"){
+    for(const k of Object.keys(S)) if(k in d) S[k] = d[k];
+  }
+}
+
+/* ═══════════ seven-segment display ═══════════ */
+const MAP = {
+  "0":"abcdef","1":"bc","2":"abdeg","3":"abcdg","4":"bcfg",
+  "5":"acdfg","6":"acdefg","7":"abc","8":"abcdefg","9":"abcdfg"," ":""
+};
+function makeDigit(){
+  const d = document.createElement("div");
+  d.className = "seg-digit";
+  [["a","h"],["b","v"],["c","v"],["d","h"],["e","v"],["f","v"],["g","h"]].forEach(([s,o])=>{
+    const el = document.createElement("span");
+    el.className = o + " " + s; el.dataset.s = s;
+    d.appendChild(el);
+  });
+  return d;
+}
+function mkDisplay(host){
+  const sign = document.createElement("div"); sign.className = "sign"; sign.innerHTML = "<i></i>";
+  const colon = document.createElement("div"); colon.className = "colon blink"; colon.innerHTML = "<i></i><i></i>";
+  const digits = [makeDigit(),makeDigit(),makeDigit(),makeDigit()];
+  host.append(sign, digits[0], digits[1], colon, digits[2], digits[3]);
+  const segs = digits.map(d => Array.from(d.querySelectorAll("span")));
+  return {
+    paint(str, negative){
+      sign.classList.toggle("on", !!negative);
+      for(let i=0;i<4;i++){
+        const on = MAP[str[i]] || "";
+        for(const sp of segs[i]) sp.classList.toggle("on", on.includes(sp.dataset.s));
+      }
+    },
+    blink(b){ colon.classList.toggle("blink", b); }
+  };
+}
+const panelA = mkDisplay(document.getElementById("readout"));
+const panelB = mkDisplay(document.getElementById("bigReadout"));
+function paint(str, negative){ panelA.paint(str,negative); panelB.paint(str,negative); }
+function setColon(b){ panelA.blink(b); panelB.blink(b); }
+function clockStr(ms){
+  const total = Math.floor(ms/1000);
+  let m = Math.floor(total/60), s = total%60;
+  if(m > 99){ m = 99; s = 59; }
+  return String(m).padStart(2," ") .replace(/ /g,"0") + String(s).padStart(2,"0");
+}
+
+/* ═══════════ audio ═══════════ */
+let ac = null;
+function audioOn(){
+  try{
+    if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if(ac.state === "suspended") ac.resume();
+  }catch(e){}
+}
+function tone(freq, dur, type, gain, delay){
+  if(!ac || !S.sound) return;
+  const t = ac.currentTime + (delay||0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || "square";
+  o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+const SFX = {
+  tick(){ tone(1450,0.028,"square",0.030); },
+  tickHot(){ tone(2350,0.032,"square",0.060); tone(1200,0.02,"square",0.03,0.055); },
+  alarm(){ for(let i=0;i<3;i++) tone(880,0.13,"square",0.13, i*0.17); },
+  heart(){ tone(72,0.19,"sine",0.16); tone(58,0.15,"sine",0.10,0.23); },
+  chime(){ tone(523,0.3,"sine",0.06); tone(784,0.34,"sine",0.045,0.13); },
+  arm(){ tone(180,0.06,"square",0.09); tone(320,0.09,"square",0.07,0.07); }
+};
+
+/* ═══════════ wake lock ═══════════ */
+let wl = null;
+async function wakeAcquire(){
+  if(!S.wake || (S.phase === "idle" && !stageOn)) return;
+  try{ if("wakeLock" in navigator && !wl){ wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release", ()=>{ wl = null; }); } }catch(e){}
+}
+function wakeRelease(){ try{ if(wl){ wl.release(); wl = null; } }catch(e){} }
+
+/* ═══════════ core logic ═══════════ */
+function restFor(blockMs, overMs){
+  const isLong = (S.blockIndex + 1) % 4 === 0;
+  let base = isLong ? S.longRest*60000 : Math.min(Math.max(blockMs * (S.ratio/100), 60000), 15*60000);
+  if(S.debt && overMs > 0) base = Math.max(base * 0.25, base - overMs, 60000);
+  return { ms: Math.round(base), isLong };
+}
+
+function startBlock(name, minutes){
+  audioOn();
+  S.phase = "work";
+  S.taskName = (name || "").trim();
+  S.durationMs = Math.round(minutes * 60000);
+  S.startedAt = Date.now();
+  S.fired = false;
+  SFX.arm(); buzz(HAPTIC.arm);
+  keepAlive(true);
+  wakeAcquire();
+  render(); save();
+}
+
+function completeBlock(){
+  const elapsed = Date.now() - S.startedAt;
+  const over = Math.max(0, elapsed - S.durationMs);
+  S.log.unshift({ n:S.taskName || "Unnamed block", p:S.durationMs, a:elapsed, t:Date.now() });
+  S.log = S.log.slice(0,60);
+
+  // drop this task from the queue if it came from there
+  if(S.queue.length && S.queue[0].name === S.taskName && S.queue[0].min*60000 === S.durationMs) S.queue.shift();
+
+  const r = restFor(S.durationMs, over);
+  S.blockIndex += 1;
+  S.restIsLong = r.isLong;
+  S.phase = "rest";
+  S.startedAt = Date.now();
+  S.durationMs = r.ms;
+  S.fired = false;
+  SFX.chime(); buzz(HAPTIC.chime);
+  keepAlive(true);
+  wakeRelease();
+  render(); save();
+}
+
+function endRest(){
+  if(S.blockIndex >= 4){ S.blockIndex = 0; S.setNum += 1; }
+  S.phase = "idle";
+  S.fired = false;
+  wakeRelease();
+  mediaClear();
+  if(S.auto && S.queue.length){
+    const q = S.queue[0];
+    startBlock(q.name, q.min);
+    return;
+  }
+  render(); save();
+}
+
+function abort(){
+  if(S.phase === "work"){
+    const elapsed = Date.now() - S.startedAt;
+    if(elapsed > 30000) S.log.unshift({ n:(S.taskName||"Unnamed block")+" (aborted)", p:S.durationMs, a:elapsed, t:Date.now(), ab:true });
+  }
+  S.phase = "idle"; S.fired = false;
+  wakeRelease();
+  keepAlive(false); mediaClear();
+  render(); save();
+}
+
+/* ═══════════ the loop ═══════════ */
+let lastSec = -1;
+const glare = document.getElementById("glare");
+
+function tick(){
+  const now = Date.now();
+  document.getElementById("clock").textContent =
+    new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",hour12:false});
+
+  if(S.phase === "idle"){
+    paint(clockStr(S.pendingMin*60000), false);
+    setColon(false);
+    setBar(0);
+    lastSec = -1;
+    return;
+  }
+
+  const elapsed = now - S.startedAt;
+  const remain = S.durationMs - elapsed;
+  const over = remain < 0;
+  const shown = Math.abs(remain);
+  const sec = Math.floor(shown/1000);
+
+  paint(clockStr(shown), over);
+  setColon(true);
+  setBar(over ? 100 : Math.min(100, (elapsed/S.durationMs)*100));
+
+  // state colouring
+  const hot = S.phase === "work" ? over : over;
+  document.body.classList.toggle("pulse", over);
+  const led = S.phase === "rest" ? (over ? "var(--red)" : "var(--amber)") : "var(--red)";
+  const deep = S.phase === "rest" ? (over ? "var(--red-deep)" : "var(--amber-deep)") : "var(--red-deep)";
+  document.documentElement.style.setProperty("--led", led);
+  document.documentElement.style.setProperty("--led-deep", deep);
+
+  // labels
+  const st = document.getElementById("statusText");
+  const meta = document.getElementById("statusMeta");
+  if(S.phase === "work"){
+    st.textContent = over ? "Overdue" : "T-minus";
+    meta.textContent = over ? "Running late" : Math.round(S.durationMs/60000) + " min block";
+  }else{
+    st.textContent = over ? "Rest exceeded" : (S.restIsLong ? "Long rest" : "Rest");
+    meta.textContent = over ? "Get back to it" : Math.round(S.durationMs/60000) + " min earned";
+  }
+
+  // one-shot on crossing zero
+  if(over && !S.fired){
+    S.fired = true;
+    buzz(HAPTIC.alarm);
+    if(S.phase === "work"){
+      SFX.alarm(); flash(3);
+      notify("Time's up", (S.taskName || "Your block") + " is now running into overtime.");
+    }else{
+      SFX.alarm(); flash(2);
+      notify("Rest is over", S.queue.length ? "Next up: " + S.queue[0].name : "Back to it.");
+    }
+    save();
+  }
+
+  // per-second sound
+  if(sec !== lastSec){
+    lastSec = sec;
+    if(S.sound && ac){
+      if(over){ if(sec % 2 === 0) SFX.heart(); }
+      else if(S.phase === "work"){
+        if(shown <= 10500){ SFX.tickHot(); flash(0.35); }
+        else SFX.tick();
+      }
+    }
+    if(over){ if(sec % 2 === 0) buzz(HAPTIC.heart); }
+    else if(S.phase === "work" && shown <= 10500){ buzz(HAPTIC.tickHot); }
+    mediaUpdate(shown, over);
+  }
+
+  // auto transition out of rest
+  if(S.phase === "rest" && S.auto && remain <= 0 && S.queue.length) endRest();
+
+  document.title = (over ? "+" : "") + clockStr(shown) + " · " + (S.taskName || "DETONATE");
+}
+
+function flash(strength){
+  glare.style.opacity = Math.min(0.9, 0.16*strength);
+  setTimeout(()=>{ glare.style.opacity = 0; }, 110);
+}
+function setBar(pct){
+  document.getElementById("barFill").style.width = pct + "%";
+  document.getElementById("stageBar").style.width = pct + "%";
+}
+
+/* ═══════════ render ═══════════ */
+function render(){
+  // wires
+  document.querySelectorAll(".wire").forEach((w,i)=>{
+    w.classList.toggle("cut", i < S.blockIndex);
+    w.classList.toggle("live", i === S.blockIndex && S.phase === "work");
+  });
+  document.getElementById("setNum").textContent = S.setNum;
+  document.getElementById("blkNum").textContent = Math.min(S.blockIndex+1,4);
+
+  // task tape
+  const tv = document.getElementById("taskVal");
+  const nm = S.phase === "idle" ? (document.getElementById("taskInput").value.trim() || (S.queue[0] ? S.queue[0].name : "")) : S.taskName;
+  tv.textContent = nm || "Unnamed block";
+  tv.classList.toggle("empty", !nm);
+
+  // buttons
+  const mb = document.getElementById("mainBtn"), ab = document.getElementById("altBtn");
+  if(S.phase === "idle"){
+    mb.textContent = S.queue.length && !document.getElementById("taskInput").value.trim() ? "Arm next" : "Arm";
+    mb.classList.remove("hot");
+    ab.textContent = "Abort"; ab.disabled = true;
+    document.getElementById("setupBlock").style.opacity = 1;
+    document.getElementById("statusText").textContent = "Standby";
+    document.getElementById("statusMeta").textContent = S.queue.length ? S.queue.length + " queued" : "Set a block";
+    document.documentElement.style.setProperty("--led","var(--red)");
+    document.documentElement.style.setProperty("--led-deep","var(--red-deep)");
+    document.body.classList.remove("pulse");
+    document.title = "DETONATE";
+  }else if(S.phase === "work"){
+    mb.textContent = "Defuse"; mb.classList.add("hot");
+    ab.textContent = "Abort"; ab.disabled = false;
+    document.getElementById("setupBlock").style.opacity = .35;
+  }else{
+    mb.textContent = S.queue.length ? "Arm next" : "End rest";
+    mb.classList.remove("hot");
+    ab.textContent = "Add 5 min"; ab.disabled = false;
+    document.getElementById("setupBlock").style.opacity = 1;
+  }
+
+  const sm = document.getElementById("stageMain");
+  sm.textContent = mb.textContent;
+  sm.classList.toggle("go", S.phase !== "rest");
+  const stName = S.phase === "idle" ? (S.queue[0] ? S.queue[0].name : "Standby")
+    : (S.phase === "rest" ? (S.restIsLong ? "Long rest" : "Rest") : (S.taskName || "Unnamed block"));
+  document.getElementById("stageTask").textContent = stName;
+
+  renderQueue(); renderLog(); renderConfig();
+  tick();
+}
+
+function renderConfig(){
+  document.getElementById("ratioNum").textContent = S.ratio + "%";
+  document.getElementById("longNum").textContent = S.longRest + " min";
+  document.getElementById("swDebt").classList.toggle("on", S.debt);
+  document.getElementById("swAuto").classList.toggle("on", S.auto);
+  document.getElementById("swSound").classList.toggle("on", S.sound);
+  document.getElementById("swWake").classList.toggle("on", S.wake);
+  document.getElementById("swStage").classList.toggle("on", S.stage);
+  document.getElementById("swHaptic").classList.toggle("on", S.haptics);
+  document.getElementById("swBg").classList.toggle("on", S.background);
+  document.getElementById("hapticRow").style.display = canBuzz ? "flex" : "none";
+  document.getElementById("stageHint").style.display = S.stage ? "block" : "none";
+  const r = document.getElementById("durRange");
+  r.value = S.pendingMin;
+  r.style.setProperty("--pct", ((S.pendingMin-1)/59*100) + "%");
+  document.getElementById("durLbl").textContent = S.pendingMin + " min";
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("sel", +c.dataset.m === S.pendingMin));
+}
+
+function renderQueue(){
+  const list = document.getElementById("queueList");
+  list.innerHTML = "";
+  if(!S.queue.length){
+    list.innerHTML = '<div class="empty-state">Nothing loaded.<br>Add tasks above and they\'ll run in order.</div>';
+  }else{
+    S.queue.forEach((q,i)=>{
+      const el = document.createElement("div");
+      el.className = "qitem" + (i===0 ? " next" : "");
+      el.innerHTML = '<span class="idx">'+String(i+1).padStart(2,"0")+'</span>'
+        + '<span class="nm"></span><span class="mn">'+q.min+' min</span>'
+        + '<button class="x" data-del="'+i+'">×</button>';
+      el.querySelector(".nm").textContent = q.name;
+      list.appendChild(el);
+    });
+  }
+  const tot = S.queue.reduce((a,b)=>a+b.min,0);
+  document.getElementById("queueTotal").textContent = tot ? tot + " min total" : "empty";
+}
+
+function renderLog(){
+  const done = S.log.filter(l=>!l.ab);
+  const focus = S.log.reduce((a,l)=>a+l.a,0);
+  const over = S.log.reduce((a,l)=>a+Math.max(0,l.a-l.p),0);
+  document.getElementById("stBlocks").textContent = done.length;
+  document.getElementById("stFocus").textContent = Math.round(focus/60000) + "m";
+  document.getElementById("stOver").textContent = Math.round(over/60000) + "m";
+
+  const accEl = document.getElementById("accNum"), accSub = document.getElementById("accSub");
+  if(done.length >= 3){
+    const ratio = done.reduce((a,l)=>a + l.a/l.p, 0)/done.length;
+    accEl.textContent = Math.round(ratio*100) + "%";
+    accSub.textContent = ratio > 1.15 ? "You under-budget. Try adding "+Math.round((ratio-1)*100)+"% to your estimates."
+      : ratio < 0.85 ? "You over-budget. Your blocks could be tighter."
+      : "Well calibrated. Keep estimating this way.";
+  }else{
+    accEl.textContent = "—";
+    accSub.textContent = "Finish three blocks to see this.";
+  }
+
+  const list = document.getElementById("logList");
+  list.innerHTML = "";
+  if(!S.log.length){
+    list.innerHTML = '<div class="empty-state">No blocks recorded yet.</div>';
+    return;
+  }
+  S.log.forEach(l=>{
+    const d = l.a - l.p;
+    const el = document.createElement("div");
+    el.className = "lgrow";
+    el.innerHTML = '<span class="nm"></span><span class="pl">'+Math.round(l.p/60000)+'m planned</span>'
+      + '<span class="ov'+(d<=0?' clean':'')+'">'+(d>0?(d<60000?"+"+Math.round(d/1000)+"s":"+"+Math.round(d/60000)+"m"):"on time")+'</span>';
+    el.querySelector(".nm").textContent = l.n;
+    list.appendChild(el);
+  });
+}
+
+/* ═══════════ sideways clock ═══════════ */
+const stage = document.getElementById("stage");
+const stageCtl = document.getElementById("stageCtl");
+let stageOn = false, stageAuto = false, ctlTimer = null, driftTimer = null;
+
+function sizeStage(){
+  const rot = stage.classList.contains("rot");
+  const W = rot ? window.innerHeight : window.innerWidth;
+  const H = rot ? window.innerWidth : window.innerHeight;
+  // row = 4 digits + colon (.34) + sign (.5) + five 4px gaps; digit height = 1.86 × width
+  // leave room for the label, the bar, and the fade-in controls at the bottom
+  const digitH = Math.min(H * 0.56, H - 168);
+  const dw = Math.max(26, Math.min((W * 0.94 - 20) / 4.84, digitH / 1.86));
+  stage.style.setProperty("--bigdw", dw.toFixed(1) + "px");
+}
+
+let stagePushed = false;
+function enterStage(rot, auto){
+  stageOn = true; stageAuto = !!auto;
+  if(!stagePushed){ try{ history.pushState({stage:1}, ""); stagePushed = true; }catch(e){} }
+  stage.classList.toggle("rot", !!rot);
+  document.body.classList.add("stage-on");
+  sizeStage();
+  wakeAcquire();
+  showCtl();
+  clearInterval(driftTimer);
+  driftTimer = setInterval(()=>{
+    const d = document.getElementById("drift");
+    d.style.transform = "translate(" + (Math.random()*16-8).toFixed(0) + "px," + (Math.random()*12-6).toFixed(0) + "px)";
+  }, 45000);
+  tick(); render();
+}
+
+function exitStage(fromBack){
+  if(stagePushed && !fromBack){ stagePushed = false; try{ history.back(); }catch(e){} }
+  stagePushed = false;
+  stageOn = false; stageAuto = false;
+  document.body.classList.remove("stage-on");
+  stage.classList.remove("rot");
+  clearInterval(driftTimer);
+  stageCtl.classList.remove("show");
+  if(S.phase === "idle") wakeRelease();
+}
+
+function showCtl(){
+  stageCtl.classList.add("show");
+  clearTimeout(ctlTimer);
+  ctlTimer = setTimeout(()=>stageCtl.classList.remove("show"), 4000);
+}
+
+stage.addEventListener("click", e=>{
+  if(e.target.closest(".stage-ctl")) return;
+  stageCtl.classList.contains("show") ? stageCtl.classList.remove("show") : showCtl();
+});
+document.getElementById("stageExit").addEventListener("click", exitStage);
+document.getElementById("stageMain").addEventListener("click", ()=>{
+  document.getElementById("mainBtn").click();
+  showCtl();
+});
+
+// tap the display → sideways clock, rotated in software (works with rotation lock on)
+document.querySelector(".window").addEventListener("click", ()=>{
+  audioOn();
+  if(!S.stage) return;
+  enterStage(window.innerWidth < window.innerHeight, false);
+});
+
+// physical rotation
+const mqLand = window.matchMedia("(orientation: landscape)");
+function onOrient(){
+  const small = Math.min(window.innerWidth, window.innerHeight) < 620;
+  if(!S.stage || !small) return;
+  if(mqLand.matches && !stageOn) enterStage(false, true);
+  else if(!mqLand.matches && stageOn && stageAuto) exitStage();
+}
+if(mqLand.addEventListener) mqLand.addEventListener("change", onOrient);
+else if(mqLand.addListener) mqLand.addListener(onOrient);
+window.addEventListener("resize", ()=>{ if(stageOn) sizeStage(); onOrient(); });
+window.addEventListener("orientationchange", ()=>setTimeout(()=>{ onOrient(); sizeStage(); }, 250));
+document.addEventListener("keydown", e=>{ if(e.key === "Escape" && stageOn) exitStage(); });
+window.addEventListener("popstate", ()=>{ if(stageOn) exitStage(true); });
+
+/* ═══════════ android platform layer ═══════════ */
+const canBuzz = typeof navigator.vibrate === "function";
+
+function buzz(pattern){
+  if(!S.haptics || !canBuzz) return;
+  try{ navigator.vibrate(pattern); }catch(e){}
+}
+const HAPTIC = {
+  arm:[16,40,26], tick:[7], tickHot:[11], defuse:[14],
+  alarm:[130,70,130,70,300], heart:[26,110,44], chime:[34,70,34]
+};
+
+// A near-silent looping track. Chrome treats the app as playing media, which stops
+// Android freezing our timers — and it's what lets the lock screen show the countdown.
+let keepEl = null;
+function silentTrack(seconds){
+  const sr = 8000, n = sr*seconds, buf = new ArrayBuffer(44+n), v = new DataView(buf);
+  const w = (o,str)=>{ for(let i=0;i<str.length;i++) v.setUint8(o+i, str.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4,36+n,true); w(8,"WAVEfmt "); v.setUint32(16,16,true);
+  v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,sr,true);
+  v.setUint32(28,sr,true); v.setUint16(32,1,true); v.setUint16(34,8,true);
+  w(36,"data"); v.setUint32(40,n,true);
+  const bytes = new Uint8Array(buf);
+  for(let i=44;i<44+n;i++) bytes[i] = 128;           // 8-bit PCM midpoint = silence
+  return URL.createObjectURL(new Blob([buf], {type:"audio/wav"}));
+}
+function keepAlive(on){
+  try{
+    if(on && S.background){
+      if(!keepEl){
+        keepEl = new Audio(silentTrack(2));
+        keepEl.loop = true; keepEl.volume = 0.001;
+        keepEl.setAttribute("playsinline","");
+      }
+      if(keepEl.paused) keepEl.play().catch(()=>{});
+    }else if(keepEl && !keepEl.paused){
+      keepEl.pause();
+    }
+  }catch(e){}
+}
+
+function hhmm(ms){
+  const t = Math.floor(ms/1000);
+  return String(Math.floor(t/60)).padStart(2,"0") + ":" + String(t%60).padStart(2,"0");
+}
+
+let mediaReady = false;
+function mediaSetup(){
+  if(mediaReady || !("mediaSession" in navigator)) return;
+  mediaReady = true;
+  const set = (k,fn)=>{ try{ navigator.mediaSession.setActionHandler(k,fn); }catch(e){} };
+  set("stop", ()=>{ if(S.phase === "work") completeBlock(); });
+  set("pause", ()=>{});
+  set("play", ()=>{});
+}
+function mediaUpdate(shown, over){
+  if(!("mediaSession" in navigator) || S.phase === "idle" || !S.background) return;
+  mediaSetup();
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: (over ? "+" : "") + hhmm(shown) + (over ? " overdue" : " left"),
+      artist: S.taskName || (S.phase === "rest" ? (S.restIsLong ? "Long rest" : "Rest") : "Focus block"),
+      album: "DETONATE",
+      artwork: [
+        { src:"icon-192.png", sizes:"192x192", type:"image/png" },
+        { src:"icon-512.png", sizes:"512x512", type:"image/png" }
+      ]
+    });
+    navigator.mediaSession.playbackState = "playing";
+    if(navigator.mediaSession.setPositionState){
+      const dur = Math.max(1, S.durationMs/1000);
+      navigator.mediaSession.setPositionState({
+        duration: dur,
+        playbackRate: 1,
+        position: Math.min(dur, Math.max(0, (Date.now()-S.startedAt)/1000))
+      });
+    }
+  }catch(e){}
+}
+function mediaClear(){
+  if(!("mediaSession" in navigator)) return;
+  try{ navigator.mediaSession.playbackState = "none"; navigator.mediaSession.metadata = null; }catch(e){}
+}
+
+async function notify(title, body){
+  if(!S.background || !("Notification" in window) || Notification.permission !== "granted") return;
+  const opts = {
+    body, tag:"detonate", renotify:true, requireInteraction:true,
+    icon:"icon-192.png", badge:"icon-mono-96.png", vibrate:[200,90,200,90,320]
+  };
+  try{
+    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    if(reg && reg.showNotification) reg.showNotification(title, opts);
+    else new Notification(title, opts);
+  }catch(e){}
+}
+async function askNotify(){
+  if(!("Notification" in window) || Notification.permission !== "default") return;
+  try{ await Notification.requestPermission(); }catch(e){}
+}
+
+// install prompt (Chrome / Edge on Android)
+let installEvent = null;
+window.addEventListener("beforeinstallprompt", e=>{
+  e.preventDefault(); installEvent = e;
+  document.getElementById("installRow").style.display = "flex";
+});
+document.getElementById("installBtn").addEventListener("click", async ()=>{
+  if(!installEvent) return;
+  installEvent.prompt();
+  try{ await installEvent.userChoice; }catch(e){}
+  installEvent = null;
+  document.getElementById("installRow").style.display = "none";
+});
+window.addEventListener("appinstalled", ()=>{
+  document.getElementById("installRow").style.display = "none";
+});
+
+/* ═══════════ wiring ═══════════ */
+// duration chips
+const chipWrap = document.getElementById("chips");
+[5,10,15,20,25,30,45,60].forEach(m=>{
+  const b = document.createElement("div");
+  b.className = "chip"; b.dataset.m = m; b.textContent = m;
+  b.addEventListener("click", ()=>{ S.pendingMin = m; renderConfig(); tick(); save(); });
+  chipWrap.appendChild(b);
+});
+document.getElementById("durRange").addEventListener("input", e=>{
+  S.pendingMin = +e.target.value; renderConfig(); tick(); save();
+});
+
+// task input: trailing number sets duration
+const taskInput = document.getElementById("taskInput");
+taskInput.addEventListener("input", ()=>{
+  const m = taskInput.value.match(/\s(\d{1,2})\s*$/);
+  if(m){ const v = Math.min(60, Math.max(1, +m[1])); S.pendingMin = v; renderConfig(); tick(); }
+  render();
+});
+taskInput.addEventListener("blur", ()=>window.scrollTo(0,0));
+
+// main button
+document.getElementById("mainBtn").addEventListener("click", ()=>{
+  audioOn();
+  if(S.background && !S.askedNotify){ S.askedNotify = true; askNotify(); save(); }
+  if(S.phase === "idle"){
+    let name = taskInput.value.trim().replace(/\s\d{1,2}\s*$/,"").trim();
+    let mins = S.pendingMin;
+    if(!name && S.queue.length){ name = S.queue[0].name; mins = S.queue[0].min; }
+    startBlock(name, mins);
+    taskInput.value = "";
+  }else if(S.phase === "work"){
+    buzz(HAPTIC.defuse);
+    completeBlock();
+  }else{
+    endRest();
+  }
+});
+// alt button
+document.getElementById("altBtn").addEventListener("click", ()=>{
+  if(S.phase === "work") abort();
+  else if(S.phase === "rest"){ S.durationMs += 5*60000; S.fired = false; render(); save(); }
+});
+
+// config steppers + switches
+document.querySelectorAll("[data-step]").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    const [k,v] = b.dataset.step.split(",");
+    if(k === "ratio") S.ratio = Math.min(60, Math.max(5, S.ratio + (+v)));
+    if(k === "long") S.longRest = Math.min(60, Math.max(10, S.longRest + (+v)));
+    renderConfig(); save();
+  });
+});
+[["swDebt","debt"],["swAuto","auto"],["swSound","sound"],["swWake","wake"],["swStage","stage"],["swHaptic","haptics"],["swBg","background"]].forEach(([id,k])=>{
+  document.getElementById(id).addEventListener("click", ()=>{
+    S[k] = !S[k];
+    if(k === "sound" && S[k]){ audioOn(); SFX.tick(); }
+    if(k === "haptics" && S[k]) buzz(HAPTIC.arm);
+    if(k === "background"){ S[k] ? (askNotify(), keepAlive(S.phase !== "idle")) : (keepAlive(false), mediaClear()); }
+    if(k === "wake"){ S[k] ? wakeAcquire() : wakeRelease(); }
+    renderConfig(); save();
+  });
+});
+
+// queue
+function addQueue(){
+  const n = document.getElementById("qName").value.trim();
+  const m = Math.min(60, Math.max(1, +document.getElementById("qMin").value || 25));
+  if(!n) return;
+  S.queue.push({ name:n, min:m });
+  document.getElementById("qName").value = "";
+  document.getElementById("qMin").value = "";
+  renderQueue(); render(); save();
+}
+document.getElementById("qAdd").addEventListener("click", addQueue);
+document.getElementById("qName").addEventListener("keydown", e=>{ if(e.key === "Enter") addQueue(); });
+document.getElementById("qMin").addEventListener("keydown", e=>{ if(e.key === "Enter") addQueue(); });
+document.getElementById("queueList").addEventListener("click", e=>{
+  const i = e.target.dataset.del;
+  if(i !== undefined){ S.queue.splice(+i,1); renderQueue(); render(); save(); }
+});
+document.getElementById("qClear").addEventListener("click", ()=>{ S.queue = []; renderQueue(); render(); save(); });
+document.getElementById("logClear").addEventListener("click", ()=>{
+  S.log = []; S.blockIndex = 0; S.setNum = 1; render(); save();
+});
+
+// tabs
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));
+    document.querySelectorAll(".pane").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on");
+    document.getElementById("pane-" + b.dataset.tab).classList.add("on");
+    document.querySelector("main").scrollTop = 0;
+  });
+});
+
+// lifecycle
+document.addEventListener("visibilitychange", ()=>{
+  if(!document.hidden){ lastSec = -1; wakeAcquire(); tick(); }
+});
+window.addEventListener("pagehide", ()=>{ store.set(KEY,S); });
+
+/* ═══════════ boot ═══════════ */
+(async function(){
+  await load();
+  // recover a session that ran past its end while the app was closed
+  if(S.phase === "rest"){
+    const past = Date.now() - S.startedAt - S.durationMs;
+    if(past > 30*60000){ S.phase = "idle"; }
+  }
+  render();
+
+  // long-press the launcher icon → ?m=25&go=1 / ?clock=1
+  try{
+    const q = new URLSearchParams(location.search);
+    const m = parseInt(q.get("m") || "", 10);
+    if(m >= 1 && m <= 60 && S.phase === "idle"){ S.pendingMin = m; renderConfig(); }
+    if(q.get("go") === "1" && S.phase === "idle"){
+      audioOn();
+      startBlock(S.queue[0] ? S.queue[0].name : "", m || S.pendingMin);
+    }
+    if(q.get("clock") === "1" && S.stage) enterStage(window.innerWidth < window.innerHeight, false);
+    if(location.search) history.replaceState(null, "", location.pathname);
+  }catch(e){}
+
+  if(S.phase !== "idle"){ keepAlive(true); }
+  onOrient();
+  setInterval(tick, 200);
+  setTimeout(()=>window.scrollTo(0,0), 60);
+  if("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("sw.js").catch(()=>{}); }catch(e){} }
+})();
+</script>
+</body>
+</html>

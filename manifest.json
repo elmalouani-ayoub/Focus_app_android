@@ -1,0 +1,30 @@
+{
+  "id": "detonate-focus",
+  "name": "DETONATE — focus blocks",
+  "short_name": "DETONATE",
+  "description": "A timeboxing timer that counts your overtime and earns you proportional rest.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#08090a",
+  "theme_color": "#08090a",
+  "categories": ["productivity", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-mono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "monochrome" }
+  ],
+  "shortcuts": [
+    { "name": "Start a 25 minute block", "short_name": "25 min", "url": "./index.html?m=25&go=1",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Start a 50 minute block", "short_name": "50 min", "url": "./index.html?m=50&go=1",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Open the sideways clock", "short_name": "Clock", "url": "./index.html?clock=1",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}
